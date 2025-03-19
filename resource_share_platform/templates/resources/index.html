@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Resource Share Platform</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        .card {
+            margin-bottom: 20px;
+        }
+        .resource-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-5">
+    <h1>Resources</h1>
+    <div id="resources-list"></div>
+    <hr>
+    <h2>Upload New Resource</h2>
+    <form id="upload-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" class="form-control" id="title" name="title" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+        </div>
+        <div class="form-group">
+            <label for="file">File input</label>
+            <input type="file" class="form-control-file" id="file" name="file" required>
+        </div>
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select class="form-control" id="category" name="category">
+                <option value="">Select a category</option>
+                {% for category in categories %}
+                    <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+    <hr>
+    <h2>Recommended Resources</h2>
+    <div id="recommended-resources-list"></div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+<script>
+$(document).ready(function() {
+    function loadResources(url) {
+        $.ajax({
+            url: url,
+            method: 'GET',
+            success: function(data) {
+                var listHtml = '';
+                data.forEach(function(resource) {
+                    listHtml += `
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">${resource.title}</h5>
+                                <p class="card-text">${resource.description}</p>
+                                <a href="/media/${resource.file}" download class="btn btn-success">Download</a>
+                                <button class="btn btn-info like-btn" data-resource-id="${resource.id}">Like (${resource.likes_count})</button>
+                                <button class="btn btn-warning favorite-btn" data-resource-id="${resource.id}">Favorite (${resource.favorites_count})</button>
+                                <button class="btn btn-secondary share-btn" data-resource-url="http://127.0.0.1:8000/api/resources/${resource.id}/">Share</button>
+                                <div class="mt-2">
+                                    <strong>Comments:</strong>
+                                    <ul>
+                                        ${resource.comments.map(comment => `<li>${comment.author_name}: ${comment.content}</li>`).join('')}
+                                    </ul>
+                                    <form class="d-flex comment-form" data-resource-id="${resource.id}">
+                                        <input type="text" class="form-control mr-2" placeholder="Add a comment" required>
+                                        <button type="submit" class="btn btn-primary">Submit</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                $('#resources-list').html(listHtml);
+            }
+        });
+    }
+
+    function loadRecommendedResources() {
+        $.ajax({
+            url: '/api/recommended/',
+            method: 'GET',
+            success: function(data) {
+                var listHtml = '';
+                data.forEach(function(resource) {
+                    listHtml += `
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">${resource.title}</h5>
+                                <p class="card-text">${resource.description}</p>
+                                <a href="/media/${resource.file}" download class="btn btn-success">Download</a>
+                                <button class="btn btn-info like-btn" data-resource-id="${resource.id}">Like (${resource.likes_count})</button>
+                                <button class="btn btn-warning favorite-btn" data-resource-id="${resource.id}">Favorite (${resource.favorites_count})</button>
+                                <button class="btn btn-secondary share-btn" data-resource-url="http://127.0.0.1:8000/api/resources/${resource.id}/">Share</button>
+                                <div class="mt-2">
+                                    <strong>Comments:</strong>
+                                    <ul>
+                                        ${resource.comments.map(comment => `<li>${comment.author_name}: ${comment.content}</li>`).join('')}
+                                    </ul>
+                                    <form class="d-flex comment-form" data-resource-id="${resource.id}">
+                                        <input type="text" class="form-control mr-2" placeholder="Add a comment" required>
+                                        <button type="submit" class="btn btn-primary">Submit</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                $('#recommended-resources-list').html(listHtml);
+            }
+        });
+    }
+
+    $('#upload-form').on('submit', function(event) {
+        event.preventDefault();
+        var formData = new FormData(this);
+
+        $.ajax({
+            url: '/api/resources/',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {'X-CSRFToken': $('input[name=csrfmiddlewaretoken]').val()},
+            success: function(response) {
+                alert('Resource uploaded successfully!');
+                $('#upload-form')[0].reset();
+                loadResources('/api/resources/');
+            },
+            error: function(xhr, status, error) {
+                alert('Error uploading resource.');
+            }
+        });
+    });
+
+    $(document).on('click', '.like-btn', function() {
+        var resourceId = $(this).data('resource-id');
+        var button = $(this);
+
+        $.ajax({
+            url: '/api/likes/',
+            method: 'POST',
+            data: JSON.stringify({ resource: resourceId }),
+            contentType: 'application/json',
+            headers: {'X-CSRFToken': $('input[name=csrfmiddlewaretoken]').val()},
+            success: function(response) {
+                button.text('Like (' + response.likes_count + ')');
+            },
+            error: function(xhr, status, error) {
+                alert('Error liking resource.');
+            }
+        });
+    });
+
+    $(document).on('click', '.favorite-btn', function() {
+        var resourceId = $(this).data('resource-id');
+        var button = $(this);
+
+        $.ajax({
+            url: '/api/favorites/',
+            method: 'POST',
+            data: JSON.stringify({ resource: resourceId }),
+            contentType: 'application/json',
+            headers: {'X-CSRFToken': $('input[name=csrfmiddlewaretoken]').val()},
+            success: function(response) {
+                button.text('Favorite (' + response.favorites_count + ')');
+            },
+            error: function(xhr, status, error) {
+                console.error('Error favoriting resource:', error);
+                alert('Error favoriting resource.');
+            }
+        });
+    });
+
+    $(document).on('click', '.share-btn', function() {
+        var resourceUrl = $(this).data('resource-url');
+        navigator.clipboard.writeText(resourceUrl).then(() => {
+            alert('Link copied to clipboard: ' + resourceUrl);
+        }, () => {
+            alert('Failed to copy link.');
+        });
+    });
+
+    $(document).on('submit', '.comment-form', function(event) {
+        event.preventDefault();
+        var resourceId = $(this).data('resource-id');
+        var commentContent = $(this).find('input[type="text"]').val();
+
+        $.ajax({
+            url: '/api/comments/',
+            method: 'POST',
+            data: JSON.stringify({ resource: resourceId, content: commentContent }),
+            contentType: 'application/json',
+            headers: {'X-CSRFToken': $('input[name=csrfmiddlewaretoken]').val()},
+            success: function(response) {
+                alert('Comment added successfully!');
+                loadResources('/api/resources/');
+            },
+            error: function(xhr, status, error) {
+                alert('Error adding comment.');
+            }
+        });
+    });
+
+    loadResources('/api/resources/');
+    loadRecommendedResources();
+});
+</script>
+</body>
+</html>
