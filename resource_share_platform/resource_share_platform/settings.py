@@ -77,7 +77,9 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 
 # 指定认证方式为电子邮件，用户将使用电子邮件地址进行登录
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
+# ACCOUNT_AUTHENTICATION_METHOD = 'email'
+
+ACCOUNT_LOGIN_METHODS = {'email'}
 
 # 启用会话记住功能，用户登录后可以选择记住登录状态
 ACCOUNT_SESSION_REMEMBER = True
